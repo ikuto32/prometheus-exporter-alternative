@@ -130,7 +130,14 @@ internal static class SwitchBotAdvertisementParser
         out double humidity,
         out double co2)
     {
+        temperature = double.NaN;
+        humidity = double.NaN;
         co2 = double.NaN;
+
+        if (IsZeroFilledAfterDeviceAddress(manufacturerData))
+        {
+            return false;
+        }
 
         if (!TryDecodeMeterTemperatureHumidity(serviceData, manufacturerData, out temperature, out humidity))
         {
@@ -143,9 +150,27 @@ internal static class SwitchBotAdvertisementParser
         }
 
         var value = (manufacturerData[13] << 8) | manufacturerData[14];
-        if (value <= 9999)
+        if (value is > 0 and <= 9999)
         {
             co2 = value;
+        }
+
+        return true;
+    }
+
+    private static bool IsZeroFilledAfterDeviceAddress(ReadOnlySpan<byte> manufacturerData)
+    {
+        if (manufacturerData.Length < 7)
+        {
+            return false;
+        }
+
+        foreach (var value in manufacturerData[6..])
+        {
+            if (value != 0)
+            {
+                return false;
+            }
         }
 
         return true;
