@@ -119,10 +119,10 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
 
                 if (device is TemperatureHumidityDevice meter)
                 {
-                    if (buffer.Length >= 11)
+                    if (SwitchBotAdvertisementParser.TryDecodeTemperatureHumidity(buffer.AsSpan(8), out var temperature, out var humidity))
                     {
-                        meter.Temperature.Value = (((double)(buffer[8] & 0x0f) / 10) + (buffer[9] & 0x7f)) * ((buffer[9] & 0x80) > 0 ? 1 : -1);
-                        meter.Humidity.Value = buffer[10] & 0x7f;
+                        meter.Temperature.Value = temperature;
+                        meter.Humidity.Value = humidity;
 
                         if (meter is Co2Device co2Device)
                         {
