@@ -30,6 +30,8 @@ public sealed class BleScanEvent
     public short? Rssi { get; init; }
 
     public IReadOnlyDictionary<ushort, byte[]>? ManufacturerData { get; init; }
+
+    public IReadOnlyDictionary<string, byte[]>? ServiceData { get; init; }
 }
 
 public sealed class BleScanSession : IAsyncDisposable
@@ -106,7 +108,8 @@ public sealed class BleScanSession : IAsyncDisposable
                 Address = TryGetString(props, "Address"),
                 Name = TryGetString(props, "Name"),
                 Alias = TryGetString(props, "Alias"),
-                Rssi = TryGetInt16(props, "RSSI")
+                Rssi = TryGetInt16(props, "RSSI"),
+                ServiceData = TryGetServiceData(props)
             });
 
 #pragma warning disable CA2012
@@ -147,7 +150,8 @@ public sealed class BleScanSession : IAsyncDisposable
                 Address = TryGetString(props, "Address"),
                 Name = TryGetString(props, "Name"),
                 Alias = TryGetString(props, "Alias"),
-                Rssi = TryGetInt16(props, "RSSI")
+                Rssi = TryGetInt16(props, "RSSI"),
+                ServiceData = TryGetServiceData(props)
             });
 
 #pragma warning disable CA2012
@@ -182,6 +186,7 @@ public sealed class BleScanSession : IAsyncDisposable
 
             var props = ev.Changed;
             var md = TryGetManufacturerData(props);
+            var serviceData = TryGetServiceData(props);
             RaiseEvent(new BleScanEvent
             {
                 Timestamp = DateTimeOffset.Now,
@@ -192,7 +197,8 @@ public sealed class BleScanSession : IAsyncDisposable
                 Name = TryGetString(props, "Name"),
                 Alias = TryGetString(props, "Alias"),
                 Rssi = TryGetInt16(props, "RSSI"),
-                ManufacturerData = md
+                ManufacturerData = md,
+                ServiceData = serviceData
             });
         }).ConfigureAwait(false);
 
@@ -261,6 +267,61 @@ public sealed class BleScanSession : IAsyncDisposable
             long l => (short)l,
             _ => null
         };
+    }
+
+    private static Dictionary<string, byte[]>? TryGetServiceData(IDictionary<string, object> props)
+    {
+        // ReSharper disable once ConditionIsAlwaysTrueOrFalseAccordingToNullableAPIContract
+        if (!props.TryGetValue("ServiceData", out var value) || (value is null))
+        {
+            return null;
+        }
+
+        if (value is IDictionary<string, byte[]> direct)
+        {
+            var res = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (key, bytes) in direct)
+            {
+                AddServiceData(res, key, bytes);
+            }
+            return res;
+        }
+
+        if (value is IDictionary<string, object> objectDictionary)
+        {
+            var res = new Dictionary<string, byte[]>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (key, obj) in objectDictionary)
+            {
+                if (obj is byte[] bytes)
+                {
+                    AddServiceData(res, key, bytes);
+                }
+                else if (obj is IEnumerable<byte> eb)
+                {
+                    AddServiceData(res, key, eb.ToArray());
+                }
+            }
+            return res;
+        }
+
+        return null;
+    }
+
+    private static void AddServiceData(IDictionary<string, byte[]> serviceData, string uuid, byte[] bytes)
+    {
+        serviceData[uuid] = bytes;
+
+        const string bluetoothBaseSuffix = "-0000-1000-8000-00805f9b34fb";
+        if (uuid.Length == 36
+            && uuid.StartsWith("0000", StringComparison.OrdinalIgnoreCase)
+            && uuid.EndsWith(bluetoothBaseSuffix, StringComparison.OrdinalIgnoreCase))
+        {
+            serviceData[uuid[4..8]] = bytes;
+        }
+        else if (uuid.Length == 4)
+        {
+            serviceData[$"0000{uuid}-0000-1000-8000-00805f9b34fb"] = bytes;
+        }
     }
 
     private static Dictionary<ushort, byte[]>? TryGetManufacturerData(IDictionary<string, object> props)
