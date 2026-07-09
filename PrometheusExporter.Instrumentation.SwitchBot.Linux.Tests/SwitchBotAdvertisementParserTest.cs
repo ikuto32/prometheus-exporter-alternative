@@ -66,6 +66,22 @@ public sealed class SwitchBotAdvertisementParserTest
     }
 
     [Fact]
+    public void TryDecodeMeterTemperatureHumidityRejectsServiceDataWithoutTemperatureHumidity()
+    {
+        byte[] serviceData = [0x80, 0x20, 0x64, 0x00, 0x10, 0xb9, 0x41];
+
+        var actual = SwitchBotAdvertisementParser.TryDecodeMeterTemperatureHumidity(
+            serviceData,
+            [],
+            out var temperature,
+            out var humidity);
+
+        Assert.False(actual);
+        Assert.True(double.IsNaN(temperature));
+        Assert.True(double.IsNaN(humidity));
+    }
+
+    [Fact]
     public void TryDecodeMeterProCo2DecodesCo2BigEndian()
     {
         byte[] manufacturerData = [0, 0, 0, 0, 0, 0, 0, 0, 0x05, 0x96, 40, 0, 0, 0x01, 0xc6];
