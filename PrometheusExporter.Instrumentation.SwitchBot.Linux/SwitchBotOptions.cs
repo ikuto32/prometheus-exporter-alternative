@@ -3,6 +3,9 @@ namespace PrometheusExporter.Instrumentation.SwitchBot;
 internal enum DeviceType
 {
     Meter,
+    MeterPro,
+    MeterProCO2,
+    Hub3,
     PlugMini
 }
 
