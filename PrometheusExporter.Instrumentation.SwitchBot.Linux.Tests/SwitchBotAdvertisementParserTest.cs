@@ -116,6 +116,42 @@ public sealed class SwitchBotAdvertisementParserTest
     }
 
     [Fact]
+    public void TryDecodeMeterProCo2DropsZeroCo2()
+    {
+        byte[] manufacturerData = [0, 0, 0, 0, 0, 0, 0, 0, 0x05, 0x96, 40, 0, 0, 0x00, 0x00];
+
+        var actual = SwitchBotAdvertisementParser.TryDecodeMeterProCo2(
+            [],
+            manufacturerData,
+            out var temperature,
+            out var humidity,
+            out var co2);
+
+        Assert.True(actual);
+        Assert.Equal(22.5, temperature, 1);
+        Assert.Equal(40d, humidity);
+        Assert.True(double.IsNaN(co2));
+    }
+
+    [Fact]
+    public void TryDecodeMeterProCo2RejectsZeroFilledDataAfterDeviceAddress()
+    {
+        byte[] manufacturerData = [0xb0, 0xe9, 0xfe, 0xe7, 0x49, 0xfe, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+
+        var actual = SwitchBotAdvertisementParser.TryDecodeMeterProCo2(
+            [],
+            manufacturerData,
+            out var temperature,
+            out var humidity,
+            out var co2);
+
+        Assert.False(actual);
+        Assert.True(double.IsNaN(temperature));
+        Assert.True(double.IsNaN(humidity));
+        Assert.True(double.IsNaN(co2));
+    }
+
+    [Fact]
     public void TryDecodeMeterTemperatureHumidityDoesNotReadHub3AsMeter()
     {
         var manufacturerData = CreateHub3ManufacturerData();
