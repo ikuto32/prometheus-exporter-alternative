@@ -40,7 +40,7 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
                     rssiMetric.Create(tags),
                     temperatureMetric.Create(tags),
                     humidityMetric.Create(tags)),
-                DeviceType.MeterProCO2 => new MeterProCO2Device(
+                DeviceType.MeterProCO2 => new MeterProCo2Device(
                     entry.Address,
                     rssiMetric.Create(tags),
                     temperatureMetric.Create(tags),
@@ -128,7 +128,7 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
                         hub3.Illuminance.Value = illuminance;
                     }
                 }
-                else if (device is MeterProCO2Device meterProCo2)
+                else if (device is MeterProCo2Device meterProCo2)
                 {
                     if (SwitchBotAdvertisementParser.TryDecodeMeterProCo2(serviceData, manufacturerData, out var temperature, out var humidity, out var co2))
                     {
@@ -265,9 +265,9 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
         }
     }
 
-    private sealed class MeterProCO2Device : Co2Device
+    private sealed class MeterProCo2Device : Co2Device
     {
-        public MeterProCO2Device(string address, IMetricSeries rssi, IMetricSeries temperature, IMetricSeries humidity, IMetricSeries co2)
+        public MeterProCo2Device(string address, IMetricSeries rssi, IMetricSeries temperature, IMetricSeries humidity, IMetricSeries co2)
             : base(address, rssi, temperature, humidity, co2)
         {
         }
