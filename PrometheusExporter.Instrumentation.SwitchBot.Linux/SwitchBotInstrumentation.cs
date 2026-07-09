@@ -19,6 +19,8 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
         var temperatureMetric = manager.CreateGauge("sensor_temperature");
         var humidityMetric = manager.CreateGauge("sensor_humidity");
         var co2Metric = manager.CreateGauge("sensor_co2");
+        var lightLevelMetric = manager.CreateGauge("sensor_light_level");
+        var illuminanceMetric = manager.CreateGauge("sensor_illuminance");
         var powerMetric = manager.CreateGauge("sensor_power");
 
         var list = new List<Device>();
@@ -48,7 +50,9 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
                     entry.Address,
                     rssiMetric.Create(tags),
                     temperatureMetric.Create(tags),
-                    humidityMetric.Create(tags)),
+                    humidityMetric.Create(tags),
+                    lightLevelMetric.Create(tags),
+                    illuminanceMetric.Create(tags)),
                 DeviceType.PlugMini => new PlugMiniDevice(
                     entry.Address,
                     rssiMetric.Create(tags),
@@ -114,7 +118,17 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
 
                 TryGetSwitchBotData(args, out var serviceData, out var manufacturerData);
 
-                if (device is MeterProCO2Device meterProCo2)
+                if (device is Hub3Device hub3)
+                {
+                    if (SwitchBotAdvertisementParser.TryDecodeHub3(manufacturerData, out var temperature, out var humidity, out var lightLevel, out var illuminance))
+                    {
+                        hub3.Temperature.Value = temperature;
+                        hub3.Humidity.Value = humidity;
+                        hub3.LightLevel.Value = lightLevel;
+                        hub3.Illuminance.Value = illuminance;
+                    }
+                }
+                else if (device is MeterProCO2Device meterProCo2)
                 {
                     if (SwitchBotAdvertisementParser.TryDecodeMeterProCo2(serviceData, manufacturerData, out var temperature, out var humidity, out var co2))
                     {
@@ -261,9 +275,28 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
 
     private sealed class Hub3Device : TemperatureHumidityDevice
     {
-        public Hub3Device(string address, IMetricSeries rssi, IMetricSeries temperature, IMetricSeries humidity)
+        public IMetricSeries LightLevel { get; }
+
+        public IMetricSeries Illuminance { get; }
+
+        public Hub3Device(
+            string address,
+            IMetricSeries rssi,
+            IMetricSeries temperature,
+            IMetricSeries humidity,
+            IMetricSeries lightLevel,
+            IMetricSeries illuminance)
             : base(address, rssi, temperature, humidity)
         {
+            LightLevel = lightLevel;
+            Illuminance = illuminance;
+        }
+
+        public override void Clear()
+        {
+            base.Clear();
+            LightLevel.Value = double.NaN;
+            Illuminance.Value = double.NaN;
         }
     }
 

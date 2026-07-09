@@ -29,6 +29,45 @@ internal static class SwitchBotAdvertisementParser
         return true;
     }
 
+    internal static bool TryDecodeHub3(
+        ReadOnlySpan<byte> manufacturerData,
+        out double temperature,
+        out double humidity,
+        out double lightLevel,
+        out double illuminance)
+    {
+        temperature = double.NaN;
+        humidity = double.NaN;
+        lightLevel = double.NaN;
+        illuminance = double.NaN;
+
+        if (manufacturerData.Length < 17)
+        {
+            return false;
+        }
+
+        var deviceData = manufacturerData[6..];
+        lightLevel = deviceData[6] & 0x0f;
+        illuminance = ConvertHub3Illuminance(lightLevel);
+
+        return TryDecodeTemperatureHumidity(deviceData[7..10], out temperature, out humidity);
+    }
+
+    private static double ConvertHub3Illuminance(double lightLevel) => lightLevel switch
+    {
+        1 => 0,
+        2 => 50,
+        3 => 90,
+        4 => 205,
+        5 => 317,
+        6 => 510,
+        7 => 610,
+        8 => 707,
+        9 => 801,
+        10 => 1023,
+        _ => double.NaN
+    };
+
     internal static bool TryDecodeMeterTemperatureHumidity(
         ReadOnlySpan<byte> serviceData,
         ReadOnlySpan<byte> manufacturerData,
