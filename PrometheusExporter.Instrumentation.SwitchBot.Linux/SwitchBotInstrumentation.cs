@@ -112,26 +112,32 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
                     device.Rssi.Value = args.Rssi.Value;
                 }
 
-                if (!TryGetSwitchBotData(args, out var buffer))
-                {
-                    return;
-                }
+                TryGetSwitchBotData(args, out var serviceData, out var manufacturerData);
 
-                if (device is TemperatureHumidityDevice meter)
+                if (device is MeterProCO2Device meterProCo2)
                 {
-                    if (SwitchBotAdvertisementParser.TryDecodeTemperatureHumidity(buffer.AsSpan(8), out var temperature, out var humidity))
+                    if (SwitchBotAdvertisementParser.TryDecodeMeterProCo2(serviceData, manufacturerData, out var temperature, out var humidity, out var co2))
+                    {
+                        meterProCo2.Temperature.Value = temperature;
+                        meterProCo2.Humidity.Value = humidity;
+
+                        if (!double.IsNaN(co2))
+                        {
+                            meterProCo2.Co2.Value = co2;
+                        }
+                    }
+                }
+                else if (device is TemperatureHumidityDevice meter)
+                {
+                    if (SwitchBotAdvertisementParser.TryDecodeMeterTemperatureHumidity(serviceData, manufacturerData, out var temperature, out var humidity))
                     {
                         meter.Temperature.Value = temperature;
                         meter.Humidity.Value = humidity;
-
-                        if (meter is Co2Device co2Device)
-                        {
-                            co2Device.Co2.Value = buffer.Length >= 16 ? (buffer[13] << 8) + buffer[14] : double.NaN;
-                        }
                     }
                 }
                 else if (device is PlugMiniDevice plug)
                 {
+                    var buffer = manufacturerData.Length > 0 ? manufacturerData : serviceData;
                     if (buffer.Length >= 12)
                     {
                         plug.Power.Value = (double)(((buffer[10] & 0b00111111) << 8) + (buffer[11] & 0b01111111)) / 10;
@@ -148,21 +154,26 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
     private static KeyValuePair<string, object?>[] MakeTags(string address, string name) =>
         [new("model", "switchbot"), new("address", address), new("name", name)];
 
-    private static bool TryGetSwitchBotData(BleScanEvent args, out byte[] buffer)
+    private static void TryGetSwitchBotData(BleScanEvent args, out byte[] serviceData, out byte[] manufacturerData)
     {
-        buffer = [];
+        serviceData = [];
+        manufacturerData = [];
 
-        if (args.ManufacturerData?.TryGetValue(0x0969, out buffer) == true)
+        if (args.ManufacturerData?.TryGetValue(0x0969, out var md) == true)
         {
-            return true;
+            manufacturerData = md;
         }
 
-        if (args.ServiceData?.TryGetValue("0000fd3d-0000-1000-8000-00805f9b34fb", out buffer) == true)
+        if (args.ServiceData?.TryGetValue("0000fd3d-0000-1000-8000-00805f9b34fb", out var sd) == true)
         {
-            return true;
+            serviceData = sd;
+            return;
         }
 
-        return args.ServiceData?.TryGetValue("fd3d", out buffer) == true;
+        if (args.ServiceData?.TryGetValue("fd3d", out sd) == true)
+        {
+            serviceData = sd;
+        }
     }
 
     //--------------------------------------------------------------------------------
