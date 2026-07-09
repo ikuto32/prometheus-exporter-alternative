@@ -206,6 +206,7 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
         {
             Address = address;
             Rssi = rssi;
+            Rssi.Value = double.NaN;
         }
 
         public abstract void Clear();
@@ -222,6 +223,8 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
         {
             Temperature = temperature;
             Humidity = humidity;
+            Temperature.Value = double.NaN;
+            Humidity.Value = double.NaN;
         }
 
         public override void Clear()
@@ -240,6 +243,7 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
             : base(address, rssi, temperature, humidity)
         {
             Co2 = co2;
+            Co2.Value = double.NaN;
         }
 
         public override void Clear()
@@ -290,6 +294,8 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
         {
             LightLevel = lightLevel;
             Illuminance = illuminance;
+            LightLevel.Value = double.NaN;
+            Illuminance.Value = double.NaN;
         }
 
         public override void Clear()
@@ -308,6 +314,7 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
             : base(address, rssi)
         {
             Power = power;
+            Power.Value = double.NaN;
         }
 
         public override void Clear()
