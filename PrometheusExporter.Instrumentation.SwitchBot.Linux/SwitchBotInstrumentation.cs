@@ -24,24 +24,37 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
         var list = new List<Device>();
         foreach (var entry in options.Device)
         {
-            if (entry.Type == DeviceType.Meter)
+            var tags = MakeTags(entry.Address, entry.Name);
+            list.Add(entry.Type switch
             {
-                var tags = MakeTags(entry.Address, entry.Name);
-                list.Add(new MeterDevice(
+                DeviceType.Meter => new MeterDevice(
                     entry.Address,
                     rssiMetric.Create(tags),
                     temperatureMetric.Create(tags),
                     humidityMetric.Create(tags),
-                    co2Metric.Create(tags)));
-            }
-            else if (entry.Type == DeviceType.PlugMini)
-            {
-                var tags = MakeTags(entry.Address, entry.Name);
-                list.Add(new PlugMiniDevice(
+                    co2Metric.Create(tags)),
+                DeviceType.MeterPro => new MeterProDevice(
                     entry.Address,
                     rssiMetric.Create(tags),
-                    powerMetric.Create(tags)));
-            }
+                    temperatureMetric.Create(tags),
+                    humidityMetric.Create(tags)),
+                DeviceType.MeterProCO2 => new MeterProCO2Device(
+                    entry.Address,
+                    rssiMetric.Create(tags),
+                    temperatureMetric.Create(tags),
+                    humidityMetric.Create(tags),
+                    co2Metric.Create(tags)),
+                DeviceType.Hub3 => new Hub3Device(
+                    entry.Address,
+                    rssiMetric.Create(tags),
+                    temperatureMetric.Create(tags),
+                    humidityMetric.Create(tags)),
+                DeviceType.PlugMini => new PlugMiniDevice(
+                    entry.Address,
+                    rssiMetric.Create(tags),
+                    powerMetric.Create(tags)),
+                _ => throw new InvalidOperationException($"Unsupported SwitchBot device type: {entry.Type}")
+            });
         }
         devices = list.ToArray();
 
@@ -104,13 +117,17 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
                     return;
                 }
 
-                if (device is MeterDevice meter)
+                if (device is TemperatureHumidityDevice meter)
                 {
                     if (buffer.Length >= 11)
                     {
                         meter.Temperature.Value = (((double)(buffer[8] & 0x0f) / 10) + (buffer[9] & 0x7f)) * ((buffer[9] & 0x80) > 0 ? 1 : -1);
                         meter.Humidity.Value = buffer[10] & 0x7f;
-                        meter.Co2.Value = buffer.Length >= 16 ? (buffer[13] << 8) + buffer[14] : double.NaN;
+
+                        if (meter is Co2Device co2Device)
+                        {
+                            co2Device.Co2.Value = buffer.Length >= 16 ? (buffer[13] << 8) + buffer[14] : double.NaN;
+                        }
                     }
                 }
                 else if (device is PlugMiniDevice plug)
@@ -152,20 +169,17 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
         public abstract void Clear();
     }
 
-    private sealed class MeterDevice : Device
+    private abstract class TemperatureHumidityDevice : Device
     {
         public IMetricSeries Temperature { get; }
 
         public IMetricSeries Humidity { get; }
 
-        public IMetricSeries Co2 { get; }
-
-        public MeterDevice(string address, IMetricSeries rssi, IMetricSeries temperature, IMetricSeries humidity, IMetricSeries co2)
+        protected TemperatureHumidityDevice(string address, IMetricSeries rssi, IMetricSeries temperature, IMetricSeries humidity)
             : base(address, rssi)
         {
             Temperature = temperature;
             Humidity = humidity;
-            Co2 = co2;
         }
 
         public override void Clear()
@@ -173,7 +187,55 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
             Rssi.Value = double.NaN;
             Temperature.Value = double.NaN;
             Humidity.Value = double.NaN;
+        }
+    }
+
+    private abstract class Co2Device : TemperatureHumidityDevice
+    {
+        public IMetricSeries Co2 { get; }
+
+        protected Co2Device(string address, IMetricSeries rssi, IMetricSeries temperature, IMetricSeries humidity, IMetricSeries co2)
+            : base(address, rssi, temperature, humidity)
+        {
+            Co2 = co2;
+        }
+
+        public override void Clear()
+        {
+            base.Clear();
             Co2.Value = double.NaN;
+        }
+    }
+
+    private sealed class MeterDevice : Co2Device
+    {
+        public MeterDevice(string address, IMetricSeries rssi, IMetricSeries temperature, IMetricSeries humidity, IMetricSeries co2)
+            : base(address, rssi, temperature, humidity, co2)
+        {
+        }
+    }
+
+    private sealed class MeterProDevice : TemperatureHumidityDevice
+    {
+        public MeterProDevice(string address, IMetricSeries rssi, IMetricSeries temperature, IMetricSeries humidity)
+            : base(address, rssi, temperature, humidity)
+        {
+        }
+    }
+
+    private sealed class MeterProCO2Device : Co2Device
+    {
+        public MeterProCO2Device(string address, IMetricSeries rssi, IMetricSeries temperature, IMetricSeries humidity, IMetricSeries co2)
+            : base(address, rssi, temperature, humidity, co2)
+        {
+        }
+    }
+
+    private sealed class Hub3Device : TemperatureHumidityDevice
+    {
+        public Hub3Device(string address, IMetricSeries rssi, IMetricSeries temperature, IMetricSeries humidity)
+            : base(address, rssi, temperature, humidity)
+        {
         }
     }
 
