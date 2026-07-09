@@ -99,6 +99,13 @@ internal static class SwitchBotAdvertisementParser
             return TryDecodeTemperatureHumidity(manufacturerData[8..11], out temperature, out humidity);
         }
 
+        if (IsMeterServiceDataWithoutTemperatureHumidity(serviceData))
+        {
+            temperature = double.NaN;
+            humidity = double.NaN;
+            return false;
+        }
+
         if (serviceData.Length >= 6)
         {
             return TryDecodeTemperatureHumidity(serviceData[3..6], out temperature, out humidity);
@@ -108,6 +115,13 @@ internal static class SwitchBotAdvertisementParser
         humidity = double.NaN;
         return false;
     }
+
+    private static bool IsMeterServiceDataWithoutTemperatureHumidity(ReadOnlySpan<byte> serviceData)
+        => serviceData.Length == 7
+            && serviceData[3] == 0x00
+            && serviceData[4] == 0x10
+            && serviceData[5] == 0xb9
+            && (serviceData[6] == 0x40 || serviceData[6] == 0x41);
 
     internal static bool TryDecodeMeterProCo2(
         ReadOnlySpan<byte> serviceData,
