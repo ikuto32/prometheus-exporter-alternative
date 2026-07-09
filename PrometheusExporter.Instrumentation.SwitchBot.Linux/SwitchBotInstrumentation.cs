@@ -112,7 +112,7 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
                     device.Rssi.Value = args.Rssi.Value;
                 }
 
-                if ((args.ManufacturerData is null) || !args.ManufacturerData.TryGetValue(0x0969, out var buffer))
+                if (!TryGetSwitchBotData(args, out var buffer))
                 {
                     return;
                 }
@@ -147,6 +147,23 @@ internal sealed class SwitchBotInstrumentation : IAsyncDisposable
 
     private static KeyValuePair<string, object?>[] MakeTags(string address, string name) =>
         [new("model", "switchbot"), new("address", address), new("name", name)];
+
+    private static bool TryGetSwitchBotData(BleScanEvent args, out byte[] buffer)
+    {
+        buffer = [];
+
+        if (args.ManufacturerData?.TryGetValue(0x0969, out buffer) == true)
+        {
+            return true;
+        }
+
+        if (args.ServiceData?.TryGetValue("0000fd3d-0000-1000-8000-00805f9b34fb", out buffer) == true)
+        {
+            return true;
+        }
+
+        return args.ServiceData?.TryGetValue("fd3d", out buffer) == true;
+    }
 
     //--------------------------------------------------------------------------------
     // Device
